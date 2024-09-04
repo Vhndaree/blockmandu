@@ -71,7 +71,5 @@ func (pow *ProofOfWork) Validate() bool {
 	hash := sha256.Sum256(data)
 	hashInt.SetBytes(hash[:])
 
-	isValid := hashInt.Cmp(pow.target) == -1
-
-	return isValid
+	return hashInt.Cmp(pow.target) == -1
 }
