@@ -13,14 +13,21 @@ func (bc *Blockchain) Iterator() *BlockchainIterator {
 
 func (bci *BlockchainIterator) Next() *Block {
 	var block *Block
+	var err error
 
-	bci.db.View(func(tx *bolt.Tx) error {
+	err = bci.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(blocksBucket))
 		encodedBlock := bucket.Get(bci.currentHash)
-		block = Deserialize(encodedBlock)
+		block, err = Deserialize(encodedBlock)
+		if err != nil {
+			return err
+		}
 
 		return nil
 	})
+	if err != nil {
+		panic(err)
+	}
 
 	bci.currentHash = block.PrevBlockHash
 	return block

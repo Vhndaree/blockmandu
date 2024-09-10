@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/gob"
 	"fmt"
 	"log"
 
@@ -13,6 +14,7 @@ func createWalletCmd() *cobra.Command {
 		Use:   "createwallet",
 		Short: "Create a blockchain with genesis block",
 		Run: func(cmd *cobra.Command, args []string) {
+			gob.Register(map[string]interface{}{})
 			wallets, err := wallet.NewWallets()
 			if err != nil {
 				log.Panic(err)

@@ -25,6 +25,10 @@ func sendCmd() *cobra.Command {
 				log.Panic("Err: Recipient address is not valid")
 			}
 
+			if from == to {
+				log.Panic("Err: Sender and Recipient address cannot be the same")
+			}
+
 			if amount <= 0 {
 				cmd.Usage()
 				os.Exit(1)
@@ -41,7 +45,10 @@ func sendCmd() *cobra.Command {
 				log.Panic(err)
 			}
 
-			bc.MineBlock([]*blockchain.Transaction{tx})
+			err = bc.MineBlock([]*blockchain.Transaction{tx})
+			if err != nil {
+				log.Panic(err)
+			}
 			fmt.Println("Success!")
 		},
 	}

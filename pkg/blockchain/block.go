@@ -51,13 +51,13 @@ func (b *Block) Serialize() []byte {
 	return result.Bytes()
 }
 
-func Deserialize(b []byte) *Block {
+func Deserialize(b []byte) (*Block, error) {
 	var block Block
 	decoder := gob.NewDecoder(bytes.NewReader(b))
 	err := decoder.Decode(&block)
 	if err != nil {
-		panic("unable to deserialize block" + err.Error())
+		return nil, err
 	}
 
-	return &block
+	return &block, nil
 }

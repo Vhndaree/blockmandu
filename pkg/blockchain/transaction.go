@@ -2,14 +2,20 @@ package blockchain
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 
 	common "github.com/blockmandu/pkg/commons"
 	"github.com/blockmandu/pkg/wallet"
 )
+
+const subsidy = 10
 
 type Transaction struct {
 	ID   []byte
@@ -17,23 +23,20 @@ type Transaction struct {
 	Vout []TXOutput
 }
 
-const subsidy = 10
-
 func NewCoinbaseTX(to, data string) (*Transaction, error) {
 	if data == "" {
 		data = "Reward to '%s'" + to
 	}
 
-	txin := TXInput{Txid: []byte{}, Vout: -1, Signature: nil, PubKey: []byte(data)}
+	txin := TXInput{[]byte{}, -1, nil, []byte(data)}
 	txout := NewTXOutput(subsidy, to)
-	tx := Transaction{ID: nil, Vin: []TXInput{txin}, Vout: []TXOutput{*txout}}
-	id, err := tx.Hash()
+	tx := Transaction{nil, []TXInput{txin}, []TXOutput{*txout}}
+	txid, err := tx.Hash()
 	if err != nil {
 		return nil, err
 	}
 
-	tx.ID = id
-
+	tx.ID = txid
 	return &tx, nil
 }
 
@@ -108,6 +111,82 @@ func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) (*Transacti
 	}
 
 	tx.ID = id
+	bc.SignTransaction(&tx, wallet.PrivateKey)
 
 	return &tx, nil
+}
+
+func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transaction) error {
+	if tx.IsCoinbase() {
+		return nil
+	}
+
+	txCopy := tx.TrimmedCopy()
+	for inID, vin := range txCopy.Vin {
+		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
+		txCopy.Vin[inID].Signature = nil
+		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
+		txid, err := txCopy.Hash()
+		if err != nil {
+			return err
+		}
+
+		txCopy.ID = txid
+		txCopy.Vin[inID].PubKey = nil
+
+		r, s, err := ecdsa.Sign(rand.Reader, &privKey, txCopy.ID)
+		if err != nil {
+			return err
+		}
+
+		signature := append(r.Bytes(), s.Bytes()...)
+		tx.Vin[inID].Signature = signature
+	}
+
+	return nil
+}
+
+func (tx Transaction) Verify(prevTxs map[string]Transaction) (bool, error) {
+	txCopy := tx.TrimmedCopy()
+	curve := elliptic.P256()
+
+	for inID, vin := range tx.Vin {
+		prevTx := prevTxs[hex.EncodeToString(vin.Txid)]
+		txCopy.Vin[inID].Signature = nil
+		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
+		txid, err := txCopy.Hash()
+		if err != nil {
+			return false, err
+		}
+
+		txCopy.ID = txid
+		txCopy.Vin[inID].PubKey = nil
+
+		r, s := big.Int{}, big.Int{}
+		siglen := len(vin.Signature)
+		r.SetBytes(vin.Signature[:(siglen / 2)])
+		s.SetBytes(vin.Signature[(siglen / 2):])
+
+		x, y := big.Int{}, big.Int{}
+		keylen := len(vin.PubKey)
+		x.SetBytes(vin.PubKey[:(keylen / 2)])
+		y.SetBytes(vin.PubKey[(keylen / 2):])
+
+		rawPubKey := ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
+		if !ecdsa.Verify(&rawPubKey, txCopy.ID, &r, &s) {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func (tx Transaction) TrimmedCopy() Transaction {
+	var inputs []TXInput
+
+	for _, vin := range tx.Vin {
+		inputs = append(inputs, TXInput{Txid: vin.Txid, Vout: vin.Vout, Signature: nil, PubKey: nil})
+	}
+
+	return Transaction{ID: tx.ID, Vin: inputs, Vout: tx.Vout}
 }

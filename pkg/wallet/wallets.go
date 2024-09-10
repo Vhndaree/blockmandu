@@ -3,6 +3,7 @@ package wallet
 import (
 	"bytes"
 	"encoding/gob"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -77,18 +78,13 @@ func (ws *Wallets) LoadFromFile() error {
 }
 
 func (ws Wallets) SaveToFile() error {
-	var content bytes.Buffer
+	var buffer bytes.Buffer
 
-	encoder := gob.NewEncoder(&content)
+	encoder := gob.NewEncoder(&buffer)
 	err := encoder.Encode(ws)
 	if err != nil {
-		return err
+		log.Panic(err)
 	}
 
-	err = os.WriteFile(walletFile, content.Bytes(), 0644)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile(walletFile, buffer.Bytes(), 0600)
 }

@@ -19,6 +19,9 @@ tools: ## installs analysis tools
 analyse: ## runs go tools analysis tools
 	fieldalignment -fix ./...
 
+reset-r: ## delete db and wallet file
+	rm resources/*
+
 help: ## Shows the help
 	@echo 'Usage: make <OPTIONS> ... <TARGETS>'
 	@echo ''
@@ -28,4 +31,4 @@ help: ## Shows the help
         awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 	@echo ''
 
-.PHONY: install update fmt vet build tools analyse
+.PHONY: install update fmt vet build tools analyse reset-r
