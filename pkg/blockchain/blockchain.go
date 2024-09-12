@@ -9,6 +9,9 @@ import (
 	"log"
 	"os"
 
+	common "github.com/blockmandu/pkg/commons"
+	"github.com/blockmandu/pkg/transaction"
+	"github.com/blockmandu/pkg/wallet"
 	"github.com/boltdb/bolt"
 )
 
@@ -68,7 +71,7 @@ func CreateBlockchain(address string) (*Blockchain, error) {
 		return nil, err
 	}
 
-	cbtx, err := NewCoinbaseTX(address, genesisCoinbaseData)
+	cbtx, err := transaction.NewCoinbaseTX(address, genesisCoinbaseData)
 	if err != nil {
 		return nil, err
 	}
@@ -101,8 +104,8 @@ func CreateBlockchain(address string) (*Blockchain, error) {
 	return &Blockchain{tip: tip, DB: db}, nil
 }
 
-func (bc *Blockchain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
-	var unspentTXs []Transaction
+func (bc *Blockchain) FindUnspentTransactions(pubKeyHash []byte) []transaction.Transaction {
+	var unspentTXs []transaction.Transaction
 	spentTXOs := make(map[string][]int)
 	bci := bc.Iterator()
 
@@ -146,8 +149,8 @@ func (bc *Blockchain) FindUnspentTransactions(pubKeyHash []byte) []Transaction {
 	return unspentTXs
 }
 
-func (bc *Blockchain) FindUTXO(pubKeyHash []byte) []TXOutput {
-	var UTXOs []TXOutput
+func (bc *Blockchain) FindUTXO(pubKeyHash []byte) []transaction.TXOutput {
+	var UTXOs []transaction.TXOutput
 	unspentTransactions := bc.FindUnspentTransactions(pubKeyHash)
 
 	for _, tx := range unspentTransactions {
@@ -185,7 +188,7 @@ Work:
 	return accumulated, unspentOutputs
 }
 
-func (bc *Blockchain) MineBlock(txs []*Transaction) error {
+func (bc *Blockchain) MineBlock(txs []*transaction.Transaction) error {
 	var lastHash []byte
 
 	for _, tx := range txs {
@@ -229,7 +232,7 @@ func (bc *Blockchain) MineBlock(txs []*Transaction) error {
 	})
 }
 
-func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
+func (bc *Blockchain) FindTransaction(ID []byte) (transaction.Transaction, error) {
 	bci := bc.Iterator()
 
 	for {
@@ -247,11 +250,11 @@ func (bc *Blockchain) FindTransaction(ID []byte) (Transaction, error) {
 		}
 	}
 
-	return Transaction{}, errors.New("Transaction is not found")
+	return transaction.Transaction{}, errors.New("Transaction is not found")
 }
 
-func (bc *Blockchain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey) error {
-	prevTXs := make(map[string]Transaction)
+func (bc *Blockchain) SignTransaction(tx *transaction.Transaction, privKey ecdsa.PrivateKey) error {
+	prevTXs := make(map[string]transaction.Transaction)
 
 	for _, vin := range tx.Vin {
 		prevTX, err := bc.FindTransaction(vin.Txid)
@@ -264,8 +267,8 @@ func (bc *Blockchain) SignTransaction(tx *Transaction, privKey ecdsa.PrivateKey)
 	return tx.Sign(privKey, prevTXs)
 }
 
-func (bc *Blockchain) VerifyTransaction(tx *Transaction) (bool, error) {
-	prevTXs := make(map[string]Transaction)
+func (bc *Blockchain) VerifyTransaction(tx *transaction.Transaction) (bool, error) {
+	prevTXs := make(map[string]transaction.Transaction)
 
 	for _, vin := range tx.Vin {
 		prevTX, err := bc.FindTransaction(vin.Txid)
@@ -276,4 +279,50 @@ func (bc *Blockchain) VerifyTransaction(tx *Transaction) (bool, error) {
 	}
 
 	return tx.Verify(prevTXs)
+}
+
+func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) (*transaction.Transaction, error) {
+	var inputs []transaction.TXInput
+	var outputs []transaction.TXOutput
+
+	wallets, err := wallet.NewWallets()
+	if err != nil {
+		return nil, err
+	}
+
+	wallet := wallets.GetWallet(from)
+	pubKeyHash := common.HashPubKey(wallet.PublicKey)
+
+	acc, validOutputs := bc.FindSpendableOutputs(pubKeyHash, amount)
+	if acc < amount {
+		return nil, fmt.Errorf("ERROR: Not enough funds")
+	}
+
+	for txid, outs := range validOutputs {
+		txID, err := hex.DecodeString(txid)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, out := range outs {
+			input := transaction.TXInput{Txid: txID, Vout: out, Signature: nil, PubKey: wallet.PublicKey}
+			inputs = append(inputs, input)
+		}
+	}
+
+	outputs = append(outputs, *transaction.NewTXOutput(amount, to))
+	if acc > amount {
+		outputs = append(outputs, *transaction.NewTXOutput(acc-amount, from))
+	}
+
+	tx := transaction.Transaction{ID: nil, Vin: inputs, Vout: outputs}
+	id, err := tx.Hash()
+	if err != nil {
+		return nil, err
+	}
+
+	tx.ID = id
+	bc.SignTransaction(&tx, wallet.PrivateKey)
+
+	return &tx, nil
 }

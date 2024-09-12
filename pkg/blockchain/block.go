@@ -5,17 +5,19 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"time"
+
+	"github.com/blockmandu/pkg/transaction"
 )
 
 type Block struct {
 	Timestamp     int64
-	Transactions  []*Transaction
+	Transactions  []*transaction.Transaction
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
 }
 
-func NewBlock(txs []*Transaction, prevBlockHash []byte) *Block {
+func NewBlock(txs []*transaction.Transaction, prevBlockHash []byte) *Block {
 	block := &Block{Timestamp: time.Now().Unix(), Transactions: txs, PrevBlockHash: prevBlockHash, Hash: []byte{}, Nonce: 0}
 	pow := NewProofOfWork(block)
 	nonce, hash := pow.Run()
@@ -24,8 +26,8 @@ func NewBlock(txs []*Transaction, prevBlockHash []byte) *Block {
 	return block
 }
 
-func NewGenesisBlock(coinbase *Transaction) *Block {
-	return NewBlock([]*Transaction{coinbase}, []byte{})
+func NewGenesisBlock(coinbase *transaction.Transaction) *Block {
+	return NewBlock([]*transaction.Transaction{coinbase}, []byte{})
 }
 
 func (b *Block) HashTransaction() []byte {

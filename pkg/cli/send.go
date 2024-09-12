@@ -7,6 +7,7 @@ import (
 
 	"github.com/blockmandu/pkg/blockchain"
 	common "github.com/blockmandu/pkg/commons"
+	"github.com/blockmandu/pkg/transaction"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +58,7 @@ func send(from, to string, amount int) {
 		log.Panic(err)
 	}
 
-	err = bc.MineBlock([]*blockchain.Transaction{tx})
+	err = bc.MineBlock([]*transaction.Transaction{tx})
 	if err != nil {
 		log.Panic(err)
 	}

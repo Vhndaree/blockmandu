@@ -1,4 +1,4 @@
-package blockchain
+package transaction
 
 import (
 	"bytes"
@@ -8,12 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"math/big"
-
-	common "github.com/blockmandu/pkg/commons"
-	"github.com/blockmandu/pkg/wallet"
 )
 
 const subsidy = 10
@@ -69,52 +65,6 @@ func (tx *Transaction) Serialize() ([]byte, error) {
 
 func (tx Transaction) IsCoinbase() bool {
 	return len(tx.Vin) == 1 && len(tx.Vin[0].Txid) == 0 && tx.Vin[0].Vout == -1
-}
-
-func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) (*Transaction, error) {
-	var inputs []TXInput
-	var outputs []TXOutput
-
-	wallets, err := wallet.NewWallets()
-	if err != nil {
-		return nil, err
-	}
-
-	wallet := wallets.GetWallet(from)
-	pubKeyHash := common.HashPubKey(wallet.PublicKey)
-
-	acc, validOutputs := bc.FindSpendableOutputs(pubKeyHash, amount)
-	if acc < amount {
-		return nil, fmt.Errorf("ERROR: Not enough funds")
-	}
-
-	for txid, outs := range validOutputs {
-		txID, err := hex.DecodeString(txid)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, out := range outs {
-			input := TXInput{Txid: txID, Vout: out, Signature: nil, PubKey: wallet.PublicKey}
-			inputs = append(inputs, input)
-		}
-	}
-
-	outputs = append(outputs, *NewTXOutput(amount, to))
-	if acc > amount {
-		outputs = append(outputs, *NewTXOutput(acc-amount, from))
-	}
-
-	tx := Transaction{ID: nil, Vin: inputs, Vout: outputs}
-	id, err := tx.Hash()
-	if err != nil {
-		return nil, err
-	}
-
-	tx.ID = id
-	bc.SignTransaction(&tx, wallet.PrivateKey)
-
-	return &tx, nil
 }
 
 func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transaction) error {
