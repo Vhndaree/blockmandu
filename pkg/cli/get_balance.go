@@ -21,26 +21,34 @@ func getBalanceCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			bc, err := blockchain.NewBlockchain(address)
-			if err != nil {
-				log.Panic(err)
-			}
-			defer bc.DB.Close()
-
-			balance := 0
-			pubKeyHash := common.Base58Decode([]byte(address))
-			pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
-			UTXOs := bc.FindUTXO(pubKeyHash)
-
-			for _, out := range UTXOs {
-				balance += out.Value
+			if !common.ValidateAddress(address) {
+				log.Panic("ERROR: Address is not valid")
 			}
 
-			fmt.Printf("Balance of '%s': %d\n", address, balance)
+			getBalance(address)
 		},
 	}
 
 	cmd.Flags().StringVarP(&address, "address", "a", "", "The address to get balance for")
 
 	return cmd
+}
+
+func getBalance(address string) {
+	bc, err := blockchain.NewBlockchain(address)
+	if err != nil {
+		log.Panic(err)
+	}
+	defer bc.DB.Close()
+
+	balance := 0
+	pubKeyHash := common.Base58Decode([]byte(address))
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
+	UTXOs := bc.FindUTXO(pubKeyHash)
+
+	for _, out := range UTXOs {
+		balance += out.Value
+	}
+
+	fmt.Printf("Balance of '%s': %d\n", address, balance)
 }

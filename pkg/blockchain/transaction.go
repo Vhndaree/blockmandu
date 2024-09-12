@@ -9,6 +9,7 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"math/big"
 
 	common "github.com/blockmandu/pkg/commons"
@@ -101,7 +102,7 @@ func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) (*Transacti
 
 	outputs = append(outputs, *NewTXOutput(amount, to))
 	if acc > amount {
-		outputs = append(outputs, *NewTXOutput(acc-amount, to))
+		outputs = append(outputs, *NewTXOutput(acc-amount, from))
 	}
 
 	tx := Transaction{ID: nil, Vin: inputs, Vout: outputs}
@@ -121,7 +122,14 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 		return nil
 	}
 
+	for _, vin := range tx.Vin {
+		if prevTXs[hex.EncodeToString(vin.Txid)].ID == nil {
+			log.Panic("ERROR: Previous transaction is not correct")
+		}
+	}
+
 	txCopy := tx.TrimmedCopy()
+
 	for inID, vin := range txCopy.Vin {
 		prevTx := prevTXs[hex.EncodeToString(vin.Txid)]
 		txCopy.Vin[inID].Signature = nil
@@ -138,8 +146,8 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 		if err != nil {
 			return err
 		}
-
 		signature := append(r.Bytes(), s.Bytes()...)
+
 		tx.Vin[inID].Signature = signature
 	}
 
@@ -147,6 +155,16 @@ func (tx *Transaction) Sign(privKey ecdsa.PrivateKey, prevTXs map[string]Transac
 }
 
 func (tx Transaction) Verify(prevTxs map[string]Transaction) (bool, error) {
+	if tx.IsCoinbase() {
+		return true, nil
+	}
+
+	for _, vin := range tx.Vin {
+		if prevTxs[hex.EncodeToString(vin.Txid)].ID == nil {
+			log.Panic("ERROR: Previous transaction is not correct")
+		}
+	}
+
 	txCopy := tx.TrimmedCopy()
 	curve := elliptic.P256()
 

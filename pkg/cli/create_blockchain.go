@@ -19,16 +19,20 @@ func createBlockchainCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			bc, err := blockchain.CreateBlockchain(address)
-			if err != nil {
-				log.Panic(err)
-			}
-
-			defer bc.DB.Close()
+			createBlockchain(address)
 		},
 	}
 
 	cmd.Flags().StringVarP(&address, "address", "a", "", "The address to send genesis block reward to")
 
 	return cmd
+}
+
+func createBlockchain(address string) {
+	bc, err := blockchain.CreateBlockchain(address)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	defer bc.DB.Close()
 }
