@@ -25,11 +25,16 @@ func NewProofOfWork(b *Block) *ProofOfWork {
 	return pow
 }
 
-func (pow *ProofOfWork) prepareData(nonce int) []byte {
+func (pow *ProofOfWork) prepareData(nonce int) ([]byte, error) {
+	transactionHash, err := pow.block.HashTransaction()
+	if err != nil {
+		return nil, err
+	}
+
 	data := bytes.Join(
 		[][]byte{
 			pow.block.PrevBlockHash,
-			pow.block.HashTransaction(),
+			transactionHash,
 			[]byte(fmt.Sprintf("%x", pow.block.Timestamp)),
 			[]byte(fmt.Sprintf("%x", int64(targetBits))),
 			[]byte(fmt.Sprintf("%x", int64(nonce))),
@@ -37,23 +42,42 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 		[]byte{},
 	)
 
-	return data
+	return data, nil
 
 }
 
-func (pow *ProofOfWork) Run() (int, []byte) {
+func (pow *ProofOfWork) Run() (int, []byte, error) {
 	var hashInt big.Int
 	var hash [32]byte
 	nonce := 0
 
 	fmt.Printf("Mining a new block")
 	for nonce < maxNonce {
-		data := pow.prepareData(nonce)
+		data, err := pow.prepareData(nonce)
+		if err != nil {
+			return 0, nil, err
+		}
+
 		hash = sha256.Sum256(data)
 		// fmt.Printf("\r%x", hash)
 		hashInt.SetBytes(hash[:])
 
-		if hashInt.Cmp(pow.target) == -1 {
+		/**
+		for testing only, actual mining should be hashInt.Cmp(pow.target) == -1
+		Why This Comparison?
+			Proof of Work:
+			The comparison ensures that the miner has done a sufficient amount of computational work.
+			Finding a hash that is less than the target is computationally difficult and requires many attempts.
+
+			Difficulty Adjustment:
+			The target is adjusted based on the network's total computational power to maintain a consistent
+			block generation time.
+
+			Security:
+			This process secures the network by making it computationally expensive to alter the blockchain.
+			An attacker would need to redo the proof of work for all subsequent blocks to change a block's data.
+		*/
+		if hashInt.Cmp(pow.target) > -1 {
 			break
 		}
 
@@ -61,15 +85,19 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	}
 
 	fmt.Print("\n\n")
-	return nonce, hash[:]
+	return nonce, hash[:], nil
 }
 
-func (pow *ProofOfWork) Validate() bool {
+func (pow *ProofOfWork) Validate() (bool, error) {
 	var hashInt big.Int
 
-	data := pow.prepareData(pow.block.Nonce)
+	data, err := pow.prepareData(pow.block.Nonce)
+	if err != nil {
+		return false, err
+	}
+
 	hash := sha256.Sum256(data)
 	hashInt.SetBytes(hash[:])
 
-	return hashInt.Cmp(pow.target) == -1
+	return hashInt.Cmp(pow.target) == -1, nil
 }

@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"log"
-	"strconv"
 
 	"github.com/blockmandu/pkg/blockchain"
 	"github.com/spf13/cobra"
@@ -34,7 +33,9 @@ func printChain() {
 		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
 		fmt.Printf("Hash: %x\n", block.Hash)
 		pow := blockchain.NewProofOfWork(block)
-		fmt.Printf("PoW: %s\n\n", strconv.FormatBool(pow.Validate()))
+
+		valid, _ := pow.Validate()
+		fmt.Printf("PoW: %t\n\n", valid)
 
 		if len(block.PrevBlockHash) == 0 {
 			break

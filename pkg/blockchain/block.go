@@ -2,7 +2,6 @@ package blockchain
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/gob"
 	"time"
 
@@ -10,51 +9,56 @@ import (
 )
 
 type Block struct {
-	Timestamp     int64
 	Transactions  []*transaction.Transaction
 	PrevBlockHash []byte
 	Hash          []byte
+	Timestamp     int64
 	Nonce         int
 }
 
-func NewBlock(txs []*transaction.Transaction, prevBlockHash []byte) *Block {
+func NewBlock(txs []*transaction.Transaction, prevBlockHash []byte) (*Block, error) {
 	block := &Block{Timestamp: time.Now().Unix(), Transactions: txs, PrevBlockHash: prevBlockHash, Hash: []byte{}, Nonce: 0}
 	pow := NewProofOfWork(block)
-	nonce, hash := pow.Run()
+	nonce, hash, err := pow.Run()
+	if err != nil {
+		return nil, err
+	}
 	block.Nonce, block.Hash = nonce, hash[:]
 
-	return block
+	return block, nil
 }
 
-func NewGenesisBlock(coinbase *transaction.Transaction) *Block {
+func NewGenesisBlock(coinbase *transaction.Transaction) (*Block, error) {
 	return NewBlock([]*transaction.Transaction{coinbase}, []byte{})
 }
 
-func (b *Block) HashTransaction() []byte {
-	var txHashes [][]byte
-	var txHash [32]byte
+func (b *Block) HashTransaction() ([]byte, error) {
+	var txs [][]byte
 
 	for _, tx := range b.Transactions {
-		txid, _ := tx.Hash()
-		txHashes = append(txHashes, txid)
-	}
-	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
+		serialized, err := tx.Serialize()
+		if err != nil {
+			return nil, err
+		}
 
-	return txHash[:]
+		txs = append(txs, serialized)
+	}
+
+	return NewMerkleTree(txs).RootNode.Data, nil
 }
 
-func (b *Block) Serialize() []byte {
+func (b *Block) Serialize() ([]byte, error) {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
 	err := encoder.Encode(b)
 	if err != nil {
-		panic("unable to serialize block" + err.Error())
+		return nil, err
 	}
 
-	return result.Bytes()
+	return result.Bytes(), nil
 }
 
-func Deserialize(b []byte) (*Block, error) {
+func DeserializeBlock(b []byte) (*Block, error) {
 	var block Block
 	decoder := gob.NewDecoder(bytes.NewReader(b))
 	err := decoder.Decode(&block)

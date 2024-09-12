@@ -8,9 +8,9 @@ import (
 
 type TXInput struct {
 	Txid      []byte
-	Vout      int
 	Signature []byte
 	PubKey    []byte
+	Vout      int
 }
 
 func (in *TXInput) UsesKey(pubKeyHash []byte) bool {

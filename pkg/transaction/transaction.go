@@ -25,7 +25,7 @@ func NewCoinbaseTX(to, data string) (*Transaction, error) {
 		data = "Reward to '%s'" + to
 	}
 
-	txin := TXInput{[]byte{}, -1, nil, []byte(data)}
+	txin := TXInput{[]byte{}, nil, []byte(data), -1}
 	txout := NewTXOutput(subsidy, to)
 	tx := Transaction{nil, []TXInput{txin}, []TXOutput{*txout}}
 	txid, err := tx.Hash()

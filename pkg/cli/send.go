@@ -53,14 +53,26 @@ func send(from, to string, amount int) {
 	}
 	defer bc.DB.Close()
 
-	tx, err := blockchain.NewUTXOTransaction(from, to, amount, bc)
+	UTXOSet := blockchain.UTXOSet{Blockchain: bc}
+
+	tx, err := blockchain.NewUTXOTransaction(from, to, amount, &UTXOSet)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	err = bc.MineBlock([]*transaction.Transaction{tx})
+	cbtx, err := transaction.NewCoinbaseTX(from, "")
 	if err != nil {
 		log.Panic(err)
 	}
+
+	block, err := bc.MineBlock([]*transaction.Transaction{cbtx, tx})
+	if err != nil {
+		log.Panic(err)
+	}
+
+	if err = UTXOSet.Update(block); err != nil {
+		log.Panic(err)
+	}
+
 	fmt.Println("Success!")
 }

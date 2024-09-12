@@ -44,10 +44,14 @@ func getBalance(address string) {
 	balance := 0
 	pubKeyHash := common.Base58Decode([]byte(address))
 	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
-	UTXOs := bc.FindUTXO(pubKeyHash)
+	UTXOs := bc.FindUTXO()
 
 	for _, out := range UTXOs {
-		balance += out.Value
+		for _, x := range out.Outputs {
+			if x.IsLockedWithKey(pubKeyHash) {
+				balance += x.Value
+			}
+		}
 	}
 
 	fmt.Printf("Balance of '%s': %d\n", address, balance)

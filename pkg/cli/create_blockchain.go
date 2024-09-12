@@ -35,4 +35,10 @@ func createBlockchain(address string) {
 	}
 
 	defer bc.DB.Close()
+
+	UTXOSet := blockchain.UTXOSet{Blockchain: bc}
+	err = UTXOSet.Reindex()
+	if err != nil {
+		log.Panic(err)
+	}
 }

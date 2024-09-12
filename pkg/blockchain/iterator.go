@@ -3,8 +3,8 @@ package blockchain
 import "github.com/boltdb/bolt"
 
 type BlockchainIterator struct {
-	currentHash []byte
 	db          *bolt.DB
+	currentHash []byte
 }
 
 func (bc *Blockchain) Iterator() *BlockchainIterator {
@@ -18,7 +18,7 @@ func (bci *BlockchainIterator) Next() *Block {
 	err = bci.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(blocksBucket))
 		encodedBlock := bucket.Get(bci.currentHash)
-		block, err = Deserialize(encodedBlock)
+		block, err = DeserializeBlock(encodedBlock)
 		if err != nil {
 			return err
 		}
